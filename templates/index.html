@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Image Masking with MAE</title>
+</head>
+<body>
+    <h1>Interactive Image Masking with MAE</h1>
+    <canvas id="canvas"></canvas>
+    <div>
+        <button onclick="applyRandomMask()">Apply Random Mask</button>
+        <input id="percent" type="number" placeholder="Enter % to mask" min="1" max="100">
+        <button onclick="processWithMAE()">Process with MAE</button>
+    </div>
+
+    <div id="mae-output">
+        <h2>MAE Output:</h2>
+        <img id="output-image" alt="MAE Output Image" style="max-width: 100%; border: 1px solid black;">
+    </div>
+
+
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let image = new Image();
+
+        // Load the initial image
+        fetch('/get_image')
+            .then(response => response.json())
+            .then(data => {
+                const imgSrc = 'data:image/png;base64,' + data.image;
+                image.src = imgSrc;
+                image.onload = () => {
+                    canvas.width = image.width;
+                    canvas.height = image.height;
+                    ctx.drawImage(image, 0, 0);
+                };
+            });
+
+        // Handle canvas clicks to toggle masks
+        canvas.addEventListener('click', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            // Send click coordinates to the backend
+            fetch('/update_mask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ x, y })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const imgSrc = 'data:image/png;base64,' + data.image;
+                    image.src = imgSrc;
+                    image.onload = () => {
+                        ctx.drawImage(image, 0, 0);
+                    };
+                });
+        });
+
+        // Apply random masks
+        function applyRandomMask() {
+            const percent = document.getElementById('percent').value || 0;
+
+            // Send percentage to the backend
+            fetch('/random_mask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ percent: percent })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const imgSrc = 'data:image/png;base64,' + data.image;
+                    image.src = imgSrc;
+                    image.onload = () => {
+                        ctx.drawImage(image, 0, 0);
+                    };
+                });
+        }
+
+        // Process the image with MAE
+        function processWithMAE() {
+            fetch('/process_with_mae', {
+                method: 'POST',
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Failed to process the image with MAE");
+                    }
+                    return response.json(); // Parse the JSON response
+                })
+                .then(data => {
+                    // Display the output image from MAE
+                    const imgSrc = 'data:image/png;base64,' + data.output_image;
+                    document.getElementById('output-image').src = imgSrc;
+                })
+                .catch(error => {
+                    document.getElementById('output-result').innerText = `Error processing image with MAE: ${error.message}`;
+                });
+        }
+
+    </script>
+</body>
+</html>
